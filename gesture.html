@@ -2,24 +2,26 @@
 <html>
 <head>
   <title>Gesture Control</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.3.0"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
 </head>
 <body>
-  <h1>Motor Gesture Control</h1>
-  <video id="webcam" autoplay playsinline width="224" height="224"></video>
-  <p id="label">Loading...</p>
+  <h1>Gesture Motor Control</h1>
+  <button onclick="init()">Start Camera & Detect</button>
+  <p id="prediction">Waiting for gesture...</p>
+  <video id="webcam" autoplay playsinline width="300" height="225"></video>
 
-  <script type="text/javascript">
-    const URL = "https://teachablemachine.withgoogle.com/models/RWox2qXNq/"; // Replace with your model link
-    const blynkToken = "RHYrkoYE3LgTrXUEDG4rW_gimR9hDUHe"; // Replace with your actual Blynk Auth Token
-
-    let model, webcam;
+  <script>
+    const URL = "https://teachablemachine.withgoogle.com/models/RWox2qXNq/";
+    let model, webcam, labelContainer, maxPredictions;
 
     async function init() {
-      model = await tmImage.load(URL + "model.json", URL + "metadata.json");
+      const modelURL = URL + "model.json";
+      const metadataURL = URL + "metadata.json";
 
-      webcam = new tmImage.Webcam(224, 224, true);
+      model = await tmImage.load(modelURL, metadataURL);
+      maxPredictions = model.getTotalClasses();
+
+      webcam = new tmImage.Webcam(300, 225, true);
       await webcam.setup();
       await webcam.play();
       window.requestAnimationFrame(loop);
@@ -33,27 +35,19 @@
       window.requestAnimationFrame(loop);
     }
 
-    let lastGesture = "";
-
     async function predict() {
       const prediction = await model.predict(webcam.canvas);
-      const labelElem = document.getElementById("label");
+      let topPrediction = prediction.reduce((a, b) => a.probability > b.probability ? a : b);
+      document.getElementById("prediction").innerText = topPrediction.className;
 
-      prediction.forEach((p) => {
-        if (p.probability > 0.95 && p.className !== lastGesture) {
-          lastGesture = p.className;
-          labelElem.innerText = "Detected: " + p.className;
-
-          if (p.className === "Start") {
-            fetch(`https://blynk.cloud/external/api/update?token=${blynkToken}&V0=1`);
-          } else if (p.className === "Stop") {
-            fetch(`https://blynk.cloud/external/api/update?token=${blynkToken}&V0=0`);
-          }
+      if (topPrediction.probability > 0.9) {
+        if (topPrediction.className === "Start") {
+          fetch("https://blynk.cloud/external/api/update?token=YourAuthToken&V0=1");
+        } else if (topPrediction.className === "Stop") {
+          fetch("https://blynk.cloud/external/api/update?token=YourAuthToken&V0=0");
         }
-      });
+      }
     }
-
-    init();
   </script>
 </body>
 </html>
