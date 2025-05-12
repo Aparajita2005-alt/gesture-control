@@ -1,50 +1,56 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Gesture Control</title>
+  <title>Gesture Motor Control</title>
   <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
 </head>
 <body>
-  <h1>Gesture Motor Control</h1>
+  <h1>Gesture Control via Camera</h1>
   <button onclick="init()">Start Camera & Detect</button>
   <p id="prediction">Waiting for gesture...</p>
-  <video id="webcam" autoplay playsinline width="300" height="225"></video>
+  <div><canvas id="canvas"></canvas></div>
 
   <script>
+    // Replace this with your own Teachable Machine model URL
     const URL = "https://teachablemachine.withgoogle.com/models/RWox2qXNq/";
-    let model, webcam, labelContainer, maxPredictions;
+
+    let model, webcam, maxPredictions;
 
     async function init() {
       const modelURL = URL + "model.json";
       const metadataURL = URL + "metadata.json";
 
+      // Load the model
       model = await tmImage.load(modelURL, metadataURL);
       maxPredictions = model.getTotalClasses();
 
-      webcam = new tmImage.Webcam(300, 225, true);
-      await webcam.setup();
+      // Setup webcam
+      webcam = new tmImage.Webcam(300, 300, true); // width, height, flip
+      await webcam.setup(); // Request access
       await webcam.play();
       window.requestAnimationFrame(loop);
 
-      document.getElementById("webcam").appendChild(webcam.canvas);
+      document.getElementById("canvas").appendChild(webcam.canvas);
     }
 
     async function loop() {
-      webcam.update();
+      webcam.update(); // Update frame
       await predict();
       window.requestAnimationFrame(loop);
     }
 
     async function predict() {
       const prediction = await model.predict(webcam.canvas);
-      let topPrediction = prediction.reduce((a, b) => a.probability > b.probability ? a : b);
-      document.getElementById("prediction").innerText = topPrediction.className;
+      let highest = prediction.reduce((a, b) => (a.probability > b.probability) ? a : b);
 
-      if (topPrediction.probability > 0.9) {
-        if (topPrediction.className === "Start") {
-          fetch("https://blynk.cloud/external/api/update?token=YourAuthToken&V0=1");
-        } else if (topPrediction.className === "Stop") {
-          fetch("https://blynk.cloud/external/api/update?token=YourAuthToken&V0=0");
+      document.getElementById("prediction").innerText = "Gesture: " + highest.className;
+
+      // Send command to Blynk if probability > 90%
+      if (highest.probability > 0.9) {
+        if (highest.className === "Start") {
+          fetch("https://blynk.cloud/external/api/update?token=YOUR_BLYNK_AUTH_TOKEN&V0=1");
+        } else if (highest.className === "Stop") {
+          fetch("https://blynk.cloud/external/api/update?token=YOUR_BLYNK_AUTH_TOKEN&V0=0");
         }
       }
     }
