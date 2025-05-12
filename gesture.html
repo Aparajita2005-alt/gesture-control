@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Gesture Control</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.3.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.4"></script>
+</head>
+<body>
+  <h1>Motor Gesture Control</h1>
+  <video id="webcam" autoplay playsinline width="224" height="224"></video>
+  <p id="label">Loading...</p>
+
+  <script type="text/javascript">
+    const URL = "https://teachablemachine.withgoogle.com/models/RWox2qXNq/"; // Replace with your model link
+    const blynkToken = "RHYrkoYE3LgTrXUEDG4rW_gimR9hDUHe"; // Replace with your actual Blynk Auth Token
+
+    let model, webcam;
+
+    async function init() {
+      model = await tmImage.load(URL + "model.json", URL + "metadata.json");
+
+      webcam = new tmImage.Webcam(224, 224, true);
+      await webcam.setup();
+      await webcam.play();
+      window.requestAnimationFrame(loop);
+
+      document.getElementById("webcam").appendChild(webcam.canvas);
+    }
+
+    async function loop() {
+      webcam.update();
+      await predict();
+      window.requestAnimationFrame(loop);
+    }
+
+    let lastGesture = "";
+
+    async function predict() {
+      const prediction = await model.predict(webcam.canvas);
+      const labelElem = document.getElementById("label");
+
+      prediction.forEach((p) => {
+        if (p.probability > 0.95 && p.className !== lastGesture) {
+          lastGesture = p.className;
+          labelElem.innerText = "Detected: " + p.className;
+
+          if (p.className === "Start") {
+            fetch(`https://blynk.cloud/external/api/update?token=${blynkToken}&V0=1`);
+          } else if (p.className === "Stop") {
+            fetch(`https://blynk.cloud/external/api/update?token=${blynkToken}&V0=0`);
+          }
+        }
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>
